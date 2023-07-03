@@ -1,13 +1,14 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"html/template"
+	"io"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
-	"io"
 )
 
 type PageData struct {
@@ -15,12 +16,17 @@ type PageData struct {
 }
 
 func main() {
+	// Command line flags
+	port := flag.Int("port", 8080, "Port to run the server on")
+	flag.Parse()
+
 	http.HandleFunc("/", homeHandler)
 	http.HandleFunc("/download/", downloadHandler)
 	http.HandleFunc("/upload", uploadHandler)
 
-	log.Println("Server started on port 9000")
-	err := http.ListenAndServe(":9000", nil)
+	portStr := fmt.Sprintf(":%d", *port)
+	log.Printf("Server started on port %d\n", *port)
+	err := http.ListenAndServe(portStr, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -90,9 +96,20 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	// TODO: Save the uploaded file
-	
-	fmt.Printf("Received file: %s, Size: %d bytes\n", handler.Filename, handler.Size)
+	// Save the uploaded file
+	filePath := filepath.Join("download", handler.Filename)
+	f, err := os.Create(filePath)
+	if err != nil {
+		http.Error(w, "Failed to save file", http.StatusInternalServerError)
+		return
+	}
+	defer f.Close()
 
-	fmt.Fprintf(w, "Coming Later")
+	_, err = io.Copy(f, file)
+	if err != nil {
+		http.Error(w, "Failed to save file", http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Fprintf(w, "File uploaded successfully!")
 }
